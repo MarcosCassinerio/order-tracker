@@ -1,0 +1,14 @@
+# Este perfil es usado por los tests de integración.
+# Testcontainers sobreescribe la URL de la DB automáticamente con @ServiceConnection.
+# Solo necesitamos deshabilitar cosas que no aplican en tests.
+
+spring:
+  jpa:
+    show-sql: true   # útil ver el SQL en los tests para detectar N+1
+  flyway:
+    enabled: true    # queremos que las migraciones corran en los tests también
+
+logging:
+  level:
+    com.example.ordertracker: DEBUG  # más verboso en tests para diagnosticar
+    org.hibernate.SQL: DEBUG

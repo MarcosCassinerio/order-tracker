@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: order-tracker
+
+  # ── Base de datos ─────────────────────────────────────────────────────────
+  # Los valores vienen de variables de entorno (12-Factor App — Factor III).
+  # En local, Docker Compose inyecta estas variables.
+  # En K8s, vienen de ConfigMap y Secrets.
+  datasource:
+    url:      ${DB_URL:jdbc:postgresql://localhost:5432/orders}
+    username: ${DB_USERNAME:app}
+    password: ${DB_PASSWORD:secret}
+    hikari:
+      maximum-pool-size: 10       # máximo de conexiones en el pool
+      minimum-idle: 2
+      connection-timeout: 30000   # 30s para obtener conexión del pool
+      idle-timeout: 600000        # 10min antes de cerrar conexión idle
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Flyway maneja el schema; Hibernate solo valida
+    show-sql: false               # true solo para debugging local
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 25  # evita N+1 en colecciones
+
+  # ── Flyway: migraciones versionadas ───────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # ── Graceful shutdown (12-Factor App — Factor IX: Disposability) ──────────
+  # Al recibir SIGTERM, Spring termina los requests en curso antes de apagarse.
+  # Kubernetes envía SIGTERM cuando va a matar el pod.
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8080
+  shutdown: graceful              # complementa spring.lifecycle config
+
+# ── Actuator: health probes para Kubernetes ───────────────────────────────────
+# Kubernetes usa estos endpoints para saber si el pod está vivo y listo.
+management:
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true             # habilita /actuator/health/liveness y /readiness
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    com.example.ordertracker: INFO
+    org.springframework.web: WARN
+  # 12-Factor App Factor XI: logs como event streams.
+  # La app escribe a stdout. Docker/K8s captura y redirige al sistema centralizado.
+  pattern:
+    console: "%d{HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

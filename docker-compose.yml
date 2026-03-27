@@ -1,0 +1,35 @@
+services:
+  # credentials are loaded from .env (git-ignored). Copy .env.example → .env to get started.
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB:       orders
+      POSTGRES_USER:     app
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"       # expose to host so you can connect with a DB client (DBeaver, psql, etc.)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # persist data between restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d orders"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Spring Boot app ──────────────────────────────────────────────────────────
+  app:
+    build: .            # uses the Dockerfile in the current directory
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL:      jdbc:postgresql://postgres:5432/orders   # 'postgres' = container name above
+      DB_USERNAME: app
+      DB_PASSWORD: secret
+    depends_on:
+      postgres:
+        condition: service_healthy   # waits for postgres healthcheck to pass before starting
+
+volumes:
+  postgres_data:
