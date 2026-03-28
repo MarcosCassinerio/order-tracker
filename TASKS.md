@@ -28,10 +28,10 @@ Connect `order-service` with `inventory-service`.
 ## Branch 3: `feature/notification-service`
 Replace the current `OrderNotificationListener` with RabbitMQ.
 
-- [ ] Add RabbitMQ to `docker-compose.yml`
-- [ ] In `order-service`: publish `OrderPlacedEvent` to RabbitMQ instead of Spring's internal event system
-- [ ] Create new Spring Boot project `notification-service` that listens to RabbitMQ and logs the notification
-- [ ] Update `docker-compose.yml` to include all 3 services
+- [x] Add RabbitMQ to `docker-compose.yml`
+- [x] In `order-service`: publish `OrderPlacedEvent` to RabbitMQ instead of Spring's internal event system
+- [x] Create new Spring Boot project `notification-service` that listens to RabbitMQ and logs the notification
+- [x] Update `docker-compose.yml` to include all 3 services
 > Note: RabbitMQ docker-compose config will be provided
 
 ---

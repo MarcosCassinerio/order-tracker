@@ -4,7 +4,8 @@ import com.example.order.dto.CreateOrderRequest;
 import com.example.order.dto.OrderResponse;
 import com.example.order.dto.StockReservationRequest;
 import com.example.order.dto.UpdateStatusRequest;
-import com.example.order.event.OrderPlacedEvent;
+import com.example.order.config.RabbitMQConfig;
+import com.example.order.dto.OrderPlacedMessage;
 import com.example.order.exception.InventoryUnavailableException;
 import com.example.order.exception.OrderNotFoundException;
 import com.example.order.model.Order;
@@ -12,7 +13,7 @@ import com.example.order.model.OrderItem;
 import com.example.order.pricing.PricingStrategyFactory;
 import com.example.order.repository.OrderRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -51,17 +52,17 @@ public class OrderService {
     // Dependencias declaradas final: inmutables, explícitas, testeables
     private final OrderRepository repository;
     private final PricingStrategyFactory pricingFactory;
-    private final ApplicationEventPublisher eventPublisher;
+    private final RabbitTemplate rabbitTemplate;
     private final WebClient inventoryClient;
 
     // Spring inyecta automáticamente los beans que implementan estas interfaces
     public OrderService(OrderRepository repository,
                         PricingStrategyFactory pricingFactory,
-                        ApplicationEventPublisher eventPublisher,
+                        RabbitTemplate rabbitTemplate,
                         WebClient inventoryClient) {
-        this.repository      = repository;
-        this.pricingFactory  = pricingFactory;
-        this.eventPublisher  = eventPublisher;
+        this.repository     = repository;
+        this.pricingFactory = pricingFactory;
+        this.rabbitTemplate = rabbitTemplate;
         this.inventoryClient = inventoryClient;
     }
 
@@ -136,7 +137,10 @@ public class OrderService {
         log.info("Pedido #{} creado. Subtotal: {} → Total con descuento: {}",
                 saved.getId(), rawSubtotal, totalAmount);
 
-        eventPublisher.publishEvent(new OrderPlacedEvent(saved));
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE,
+                RabbitMQConfig.ROUTING_KEY,
+                OrderPlacedMessage.from(saved));
 
         return OrderResponse.from(saved);
     }
