@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-tracker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-tracker
+  template:
+    metadata:
+      labels:
+        app: order-tracker
+    spec:
+      containers:
+        - name: order-tracker
+          image: ghcr.io/marcoscassinerio/order-tracker:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: order-tracker-secret
+                  key: db-username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: order-tracker-secret
+                  key: db-password
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/orders   # 'postgres' = the Service name in postgres.yml
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 30    # give Spring Boot time to start before probing
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-tracker
+spec:
+  selector:
+    app: order-tracker
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: LoadBalancer      # exposes the app externally — cloud providers assign a public IP here
