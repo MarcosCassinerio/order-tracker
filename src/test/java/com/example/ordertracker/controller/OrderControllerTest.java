@@ -91,7 +91,7 @@ class OrderControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(mapper.writeValueAsString(validRequest())))
                     .andExpect(status().isCreated())                              // 201
-                    .andExpect(header().string("Location", "/api/v1/orders/1"))  // header Location
+                    .andExpect(header().string("Location", "http://localhost/api/v1/orders/1"))  // header Location
                     .andExpect(jsonPath("$.id").value(1))
                     .andExpect(jsonPath("$.status").value("PENDING"))
                     .andExpect(jsonPath("$.totalAmount").value(1050.00));
