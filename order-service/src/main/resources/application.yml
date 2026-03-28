@@ -1,6 +1,6 @@
 spring:
   application:
-    name: order-tracker
+    name: order-service
 
   # ── Base de datos ─────────────────────────────────────────────────────────
   # Los valores vienen de variables de entorno (12-Factor App — Factor III).
@@ -53,9 +53,14 @@ management:
       exposure:
         include: health,info,metrics
 
+# ── Inter-service communication ───────────────────────────────────────────────
+services:
+  inventory:
+    url: ${INVENTORY_SERVICE_URL:http://localhost:8081}
+
 logging:
   level:
-    com.example.ordertracker: INFO
+    com.example.order: INFO
     org.springframework.web: WARN
   # 12-Factor App Factor XI: logs como event streams.
   # La app escribe a stdout. Docker/K8s captura y redirige al sistema centralizado.

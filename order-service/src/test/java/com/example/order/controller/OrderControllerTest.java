@@ -70,7 +70,7 @@ class OrderControllerTest {
         return new CreateOrderRequest(
                 1L,
                 "cliente@example.com",
-                List.of(new OrderItemRequest("PROD-1", "Laptop", 2, new BigDecimal("500.00"))),
+                List.of(new OrderItemRequest(1L, "Laptop", 2, new BigDecimal("500.00"))),
                 "REGULAR"
         );
     }
@@ -103,7 +103,7 @@ class OrderControllerTest {
             var badRequest = new CreateOrderRequest(
                     null,                         // ← customerId nulo (inválido)
                     "cliente@example.com",
-                    List.of(new OrderItemRequest("P1", "Prod", 1, BigDecimal.TEN)),
+                    List.of(new OrderItemRequest(1L, "Prod", 1, BigDecimal.TEN)),
                     "REGULAR"
             );
 
@@ -121,7 +121,7 @@ class OrderControllerTest {
             var badRequest = new CreateOrderRequest(
                     1L,
                     "no-es-un-email",             // ← formato inválido
-                    List.of(new OrderItemRequest("P1", "Prod", 1, BigDecimal.TEN)),
+                    List.of(new OrderItemRequest(1L, "Prod", 1, BigDecimal.TEN)),
                     "REGULAR"
             );
 

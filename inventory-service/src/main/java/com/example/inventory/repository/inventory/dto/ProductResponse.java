@@ -2,14 +2,12 @@ package com.example.inventory.repository.inventory.dto;
 
 import com.example.inventory.repository.inventory.model.Product;
 
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.List;
 
 public record ProductResponse(
         Long id,
         String name,
-        BigDecimal stock,
+        Integer stock,
         Instant createdAt,
         Instant updatedAt
 ) {

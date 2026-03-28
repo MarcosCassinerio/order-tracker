@@ -6,7 +6,6 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
@@ -36,8 +35,8 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, precision = 12, scale = 2)
-    private BigDecimal stock;
+    @Column(nullable = false)
+    private Integer stock;
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -47,8 +46,8 @@ public class Product {
     private Instant updatedAt;
 
 
-    public static Product create(String name, BigDecimal stock) {
-        if (stock.compareTo(BigDecimal.ZERO) < 0)
+    public static Product create(String name, Integer stock) {
+        if (stock < 0)
             throw new IllegalArgumentException("El stock no puede ser negativo");
 
         var product = new Product();
@@ -57,17 +56,17 @@ public class Product {
         return product;
     }
 
-    public void reserveStock(BigDecimal reserveAmount) {
-        if (this.stock.compareTo(reserveAmount) < 0) {
+    public void reserveStock(Integer reserveAmount) {
+        if (this.stock < reserveAmount) {
             throw new InvalidReserveAmountException(
                     "Se intento reservar %s mientras se tiene %s en stock".formatted(reserveAmount, this.stock)
             );
         }
 
-        this.stock = this.stock.subtract(reserveAmount);
+        this.stock = this.stock - reserveAmount;
     }
 
-    public void releaseStock(BigDecimal releaseAmount) {
-        this.stock = this.stock.add(releaseAmount);
+    public void releaseStock(Integer releaseAmount) {
+        this.stock = this.stock + releaseAmount;
     }
 }

@@ -15,8 +15,6 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.math.BigDecimal;
-
 import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest
@@ -42,11 +40,11 @@ class ProductServiceIntegrationTest {
     @Test
     @DisplayName("crear producto persiste en PostgreSQL con todos los campos")
     void createProduct_persistsToDatabase() {
-        var response = productService.createProduct(new CreateProductRequest("Laptop", new BigDecimal("10.00")));
+        var response = productService.createProduct(new CreateProductRequest("Laptop", 10));
 
         var found = productRepository.findById(response.id()).orElseThrow();
         assertThat(found.getName()).isEqualTo("Laptop");
-        assertThat(found.getStock()).isEqualByComparingTo("10.00");
+        assertThat(found.getStock()).isEqualTo(10);
     }
 
     @Test
@@ -55,7 +53,7 @@ class ProductServiceIntegrationTest {
         var response = productService.createProduct(new CreateProductRequest("Mouse", null));
 
         var found = productRepository.findById(response.id()).orElseThrow();
-        assertThat(found.getStock()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(found.getStock()).isEqualTo(0);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -65,25 +63,25 @@ class ProductServiceIntegrationTest {
     @Test
     @DisplayName("reservar stock válido → stock reducido en DB")
     void reserveStock_reducesStockInDatabase() {
-        var product = productService.createProduct(new CreateProductRequest("Laptop", new BigDecimal("10.00")));
+        var product = productService.createProduct(new CreateProductRequest("Laptop", 10));
 
-        productService.reserveStock(product.id(), new UpdateStockRequest(new BigDecimal("3.00")));
+        productService.reserveStock(product.id(), new UpdateStockRequest(3));
 
         var found = productRepository.findById(product.id()).orElseThrow();
-        assertThat(found.getStock()).isEqualByComparingTo("7.00");
+        assertThat(found.getStock()).isEqualTo(7);
     }
 
     @Test
     @DisplayName("reservar más del stock disponible → excepción, stock no cambia")
     void reserveStock_insufficient_throwsAndDoesNotPersist() {
-        var product = productService.createProduct(new CreateProductRequest("Laptop", new BigDecimal("5.00")));
+        var product = productService.createProduct(new CreateProductRequest("Laptop", 5));
 
         assertThatThrownBy(() ->
-                productService.reserveStock(product.id(), new UpdateStockRequest(new BigDecimal("99.00")))
+                productService.reserveStock(product.id(), new UpdateStockRequest(99))
         ).isInstanceOf(InvalidReserveAmountException.class);
 
         var found = productRepository.findById(product.id()).orElseThrow();
-        assertThat(found.getStock()).isEqualByComparingTo("5.00");
+        assertThat(found.getStock()).isEqualTo(5);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -93,12 +91,12 @@ class ProductServiceIntegrationTest {
     @Test
     @DisplayName("liberar stock → stock aumentado en DB")
     void releaseStock_increasesStockInDatabase() {
-        var product = productService.createProduct(new CreateProductRequest("Laptop", new BigDecimal("10.00")));
+        var product = productService.createProduct(new CreateProductRequest("Laptop", 10));
 
-        productService.releaseStock(product.id(), new UpdateStockRequest(new BigDecimal("5.00")));
+        productService.releaseStock(product.id(), new UpdateStockRequest(5));
 
         var found = productRepository.findById(product.id()).orElseThrow();
-        assertThat(found.getStock()).isEqualByComparingTo("15.00");
+        assertThat(found.getStock()).isEqualTo(15);
     }
 
     // ══════════════════════════════════════════════════════════════════════════

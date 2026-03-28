@@ -38,6 +38,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(pd);
     }
 
+    // 409 — Stock insuficiente en inventory-service
+    @ExceptionHandler(InventoryUnavailableException.class)
+    public ResponseEntity<ProblemDetail> handleInventoryUnavailable(InventoryUnavailableException ex) {
+        var pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Inventory Unavailable");
+        pd.setType(URI.create("https://api.example.com/errors/inventory-unavailable"));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(pd);
+    }
+
     // 409 — Transición de estado inválida
     @ExceptionHandler(InvalidStatusTransitionException.class)
     public ResponseEntity<ProblemDetail> handleConflict(InvalidStatusTransitionException ex) {
