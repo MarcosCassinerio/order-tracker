@@ -25,9 +25,11 @@ jobs:
 
       - name: Run unit tests
         run: mvn test -Dtest="OrderServiceTest,PricingStrategyTest,OrderStatusTest,OrderControllerTest"
+        working-directory: order-service
 
       - name: Run integration tests
         run: mvn test -Dtest="OrderServiceIntegrationTest"
+        working-directory: order-service
         # Testcontainers works here because GitHub Actions runners have Docker installed
 
   # ── Job 2: Build & Push Docker image ────────────────────────────────────────
@@ -57,6 +59,6 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: order-service
           push: true
           tags: ${{ env.IMAGE }}
