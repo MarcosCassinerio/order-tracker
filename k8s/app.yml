@@ -1,35 +1,38 @@
+# ── order-service ─────────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-tracker
+  name: order-service
+  namespace: order-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: order-tracker
+      app: order-service
   template:
     metadata:
       labels:
-        app: order-tracker
+        app: order-service
     spec:
       containers:
-        - name: order-tracker
-          image: ghcr.io/marcoscassinerio/order-tracker:latest
+        - name: order-service
+          image: ghcr.io/marcoscassinerio/order-tracker/order-service:latest
+          imagePullPolicy: Always    # always pull latest image — enables auto-update on rollout restart
           ports:
             - containerPort: 8080
           env:
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: order-tracker-secret
+                  name: order-service-secret
                   key: db-username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: order-tracker-secret
+                  name: order-service-secret
                   key: db-password
             - name: DB_URL
-              value: jdbc:postgresql://postgres:5432/orders   # 'postgres' = the Service name in postgres.yml
+              value: jdbc:postgresql://postgres:5432/orders
           resources:
             requests:
               memory: 256Mi
@@ -41,7 +44,7 @@ spec:
             httpGet:
               path: /actuator/health/liveness
               port: 8080
-            initialDelaySeconds: 60    # give Spring Boot time to start before probing
+            initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 3
           readinessProbe:
@@ -56,11 +59,84 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: order-tracker
+  name: order-service
+  namespace: order-service
 spec:
   selector:
-    app: order-tracker
+    app: order-service
   ports:
     - port: 80
       targetPort: 8080
-  type: LoadBalancer      # exposes the app externally — cloud providers assign a public IP here
+  type: LoadBalancer
+
+---
+# ── inventory-service ──────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: inventory-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      containers:
+        - name: inventory-service
+          image: ghcr.io/marcoscassinerio/order-tracker/inventory-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8081
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-service-secret
+                  key: db-username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-service-secret
+                  key: db-password
+            - name: DB_URL
+              value: jdbc:postgresql://postgres:5432/inventory
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  namespace: inventory-service
+spec:
+  selector:
+    app: inventory-service
+  ports:
+    - port: 80
+      targetPort: 8081
+  type: LoadBalancer

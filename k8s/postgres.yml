@@ -1,10 +1,12 @@
+# ── order-service PostgreSQL ───────────────────────────────────────────────────
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-pvc
+  name: postgres-orders-pvc
+  namespace: order-service
 spec:
   accessModes:
-    - ReadWriteOnce     # only one node can mount this volume at a time (fine for a single Postgres pod)
+    - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi
@@ -14,8 +16,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres
+  namespace: order-service
 spec:
-  replicas: 1           # never run multiple Postgres replicas without a proper HA setup (e.g. Patroni)
+  replicas: 1
   selector:
     matchLabels:
       app: postgres
@@ -31,17 +34,17 @@ spec:
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: order-tracker-secret
+                  name: order-service-secret
                   key: db-name
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: order-tracker-secret
+                  name: order-service-secret
                   key: db-username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: order-tracker-secret
+                  name: order-service-secret
                   key: db-password
           ports:
             - containerPort: 5432
@@ -63,17 +66,103 @@ spec:
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:
-            claimName: postgres-pvc
+            claimName: postgres-orders-pvc
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres
+  namespace: order-service
 spec:
   selector:
     app: postgres
   ports:
     - port: 5432
       targetPort: 5432
-  type: ClusterIP         # only accessible inside the cluster — Postgres is never exposed externally
+  type: ClusterIP
+
+---
+# ── inventory-service PostgreSQL ──────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-inventory-pvc
+  namespace: inventory-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: inventory-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-service-secret
+                  key: db-name
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-service-secret
+                  key: db-username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-service-secret
+                  key: db-password
+          ports:
+            - containerPort: 5432
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "app", "-d", "inventory"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-inventory-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: inventory-service
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
