@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 /**
  * UNIT TEST de OrderService.
@@ -79,11 +80,12 @@ class OrderServiceTest {
     @BeforeEach
     void setUp() {
         // Stub del WebClient fluent chain — happy path por defecto
-        when(inventoryClient.patch()).thenReturn(requestBodyUriSpec);
-        when(requestBodyUriSpec.uri(anyString(), (Object) any())).thenReturn(requestBodySpec);
-        doReturn(requestHeadersSpec).when(requestBodySpec).bodyValue(any());
-        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(Void.class)).thenReturn(Mono.empty());
+        // lenient: estas stubs no se usan en FindByIdTests ni UpdateStatusTests
+        lenient().when(inventoryClient.patch()).thenReturn(requestBodyUriSpec);
+        lenient().when(requestBodyUriSpec.uri(anyString(), (Object) any())).thenReturn(requestBodySpec);
+        lenient().doReturn(requestHeadersSpec).when(requestBodySpec).bodyValue(any(Object.class));
+        lenient().when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        lenient().when(responseSpec.bodyToMono(Void.class)).thenReturn(Mono.empty());
 
         // Request válido que usamos en la mayoría de los tests
         validRequest = new CreateOrderRequest(
@@ -315,8 +317,6 @@ class OrderServiceTest {
             when(responseSpec.bodyToMono(Void.class))
                     .thenReturn(Mono.error(new RuntimeException("409 Conflict")));
 
-            when(pricingFactory.get(any())).thenReturn(new RegularPricing());
-
             assertThatThrownBy(() -> service.placeOrder(validRequest))
                     .isInstanceOf(InventoryUnavailableException.class);
         }
@@ -330,8 +330,6 @@ class OrderServiceTest {
                     .thenReturn(Mono.error(new RuntimeException("409 Conflict")))
                     .thenReturn(Mono.empty()); // release of first item
 
-            when(pricingFactory.get(any())).thenReturn(new RegularPricing());
-
             assertThatThrownBy(() -> service.placeOrder(validRequest))
                     .isInstanceOf(InventoryUnavailableException.class);
 
@@ -344,8 +342,6 @@ class OrderServiceTest {
         void inventoryFails_orderNotSaved() {
             when(responseSpec.bodyToMono(Void.class))
                     .thenReturn(Mono.error(new RuntimeException("409 Conflict")));
-
-            when(pricingFactory.get(any())).thenReturn(new RegularPricing());
 
             assertThatThrownBy(() -> service.placeOrder(validRequest))
                     .isInstanceOf(InventoryUnavailableException.class);

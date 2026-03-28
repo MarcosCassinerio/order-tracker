@@ -11,8 +11,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -22,6 +25,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 
 /**
  * INTEGRATION TEST con Testcontainers.
@@ -60,6 +67,23 @@ class OrderServiceIntegrationTest {
 
     @Autowired OrderService    orderService;
     @Autowired OrderRepository orderRepository;
+
+    // Stub WebClient so tests don't need a real inventory-service running
+    @MockBean WebClient inventoryClient;
+
+    @org.junit.jupiter.api.BeforeEach
+    void stubInventory() {
+        var requestBodyUriSpec  = org.mockito.Mockito.mock(WebClient.RequestBodyUriSpec.class);
+        var requestBodySpec     = org.mockito.Mockito.mock(WebClient.RequestBodySpec.class);
+        var requestHeadersSpec  = org.mockito.Mockito.mock(WebClient.RequestHeadersSpec.class);
+        var responseSpec        = org.mockito.Mockito.mock(WebClient.ResponseSpec.class);
+
+        when(inventoryClient.patch()).thenReturn(requestBodyUriSpec);
+        when(requestBodyUriSpec.uri(anyString(), (Object) any())).thenReturn(requestBodySpec);
+        doReturn(requestHeadersSpec).when(requestBodySpec).bodyValue(any());
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(Void.class)).thenReturn(Mono.empty());
+    }
 
     // ── Fixture ───────────────────────────────────────────────────────────────
 
