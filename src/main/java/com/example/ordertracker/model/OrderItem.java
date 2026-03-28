@@ -22,6 +22,10 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
+
     @Column(nullable = false)
     private String productId;
 
@@ -33,6 +37,11 @@ public class OrderItem {
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
+
+    // Package-private: only Order (same package) sets this when building the aggregate
+    void assignOrder(Order order) {
+        this.order = order;
+    }
 
     // Factory method: controla la creación, valida invariantes
     public static OrderItem of(String productId, String productName,

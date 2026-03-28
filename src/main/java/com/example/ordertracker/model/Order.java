@@ -54,8 +54,7 @@ public class Order {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "order_id")
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
     @CreationTimestamp
@@ -84,10 +83,11 @@ public class Order {
             throw new IllegalArgumentException("El total no puede ser negativo");
 
         var order = new Order();
-        order.customerId    = customerId;
-        order.contactEmail  = contactEmail;
-        order.items         = new ArrayList<>(items);
-        order.totalAmount   = totalAmount;
+        order.customerId   = customerId;
+        order.contactEmail = contactEmail;
+        order.totalAmount  = totalAmount;
+        order.items        = new ArrayList<>(items);
+        order.items.forEach(item -> item.assignOrder(order));  // set FK so JPA inserts order_id correctly
         return order;
     }
 
