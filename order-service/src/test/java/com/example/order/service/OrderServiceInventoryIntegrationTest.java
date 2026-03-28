@@ -10,8 +10,10 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -51,7 +53,8 @@ class OrderServiceInventoryIntegrationTest {
         registry.add("services.inventory.url", wireMock::baseUrl);
     }
 
-    @Autowired OrderService orderService;
+    @MockBean  RabbitTemplate rabbitTemplate;
+    @Autowired OrderService   orderService;
 
     // ══════════════════════════════════════════════════════════════════════════
     // Happy path
