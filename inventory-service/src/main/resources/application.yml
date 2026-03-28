@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: inventory-service
+
+  datasource:
+    url:      ${DB_URL:jdbc:postgresql://localhost:5432/inventory}
+    username: ${DB_USERNAME:app}
+    password: ${DB_PASSWORD:secret}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8081          # different port from order-service (8080)
+  shutdown: graceful
+
+management:
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    com.example.inventory: INFO
+    org.springframework.web: WARN
+  pattern:
+    console: "%d{HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
