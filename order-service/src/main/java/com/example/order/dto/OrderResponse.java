@@ -47,7 +47,7 @@ public record OrderResponse(
     // ── DTO anidado para los ítems ─────────────────────────────────────────
     public record OrderItemResponse(
             Long id,
-            String productId,
+            Long productId,
             String productName,
             Integer quantity,
             BigDecimal unitPrice,

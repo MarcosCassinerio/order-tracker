@@ -27,7 +27,7 @@ public class OrderItem {
     private Order order;
 
     @Column(nullable = false)
-    private String productId;
+    private Long productId;
 
     @Column(nullable = false)
     private String productName;
@@ -44,7 +44,7 @@ public class OrderItem {
     }
 
     // Factory method: controla la creación, valida invariantes
-    public static OrderItem of(String productId, String productName,
+    public static OrderItem of(Long productId, String productName,
                                 int quantity, BigDecimal unitPrice) {
         if (quantity <= 0)
             throw new IllegalArgumentException("La cantidad debe ser mayor a 0");

@@ -5,23 +5,23 @@
 ## Branch 1: `feature/inventory-service`
 Create a new Spring Boot project `inventory-service` from scratch.
 
-- [ ] `Product` entity with `productId`, `name`, `stock` (quantity available)
-- [ ] `POST /inventory` → create a product with initial stock
-- [ ] `GET /inventory/{productId}` → check stock
-- [ ] `POST /inventory/{productId}/reserve` → reduce stock by a given quantity, reject if not enough
-- [ ] `POST /inventory/{productId}/release` → return stock (for cancelled orders)
-- [ ] Unit + integration tests
+- [x] `Product` entity with `productId`, `name`, `stock` (quantity available)
+- [x] `POST /inventory` → create a product with initial stock
+- [x] `GET /inventory/{productId}` → check stock
+- [x] `POST /inventory/{productId}/reserve` → reduce stock by a given quantity, reject if not enough
+- [x] `POST /inventory/{productId}/release` → return stock (for cancelled orders)
+- [x] Unit + integration tests
 
 ---
 
 ## Branch 2: `feature/order-inventory-integration`
 Connect `order-service` with `inventory-service`.
 
-- [ ] Add `WebClient` to `order-service` (non-blocking HTTP client)
-- [ ] Before placing an order, call `inventory-service` to reserve stock for each item
-- [ ] If any item is out of stock → reject the order and release already-reserved items (rollback)
-- [ ] Add `InventoryUnavailableException` + handler in `GlobalExceptionHandler`
-- [ ] Update integration tests
+- [x] Add `WebClient` to `order-service` (non-blocking HTTP client)
+- [x] Before placing an order, call `inventory-service` to reserve stock for each item
+- [x] If any item is out of stock → reject the order and release already-reserved items (rollback)
+- [x] Add `InventoryUnavailableException` + handler in `GlobalExceptionHandler`
+- [x] Update integration tests
 
 ---
 

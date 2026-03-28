@@ -68,8 +68,8 @@ class OrderServiceIntegrationTest {
                 customerId,
                 "cliente%d@example.com".formatted(customerId),
                 List.of(
-                        new OrderItemRequest("PROD-1", "Laptop", 1, new BigDecimal("999.00")),
-                        new OrderItemRequest("PROD-2", "Mouse",  2, new BigDecimal("25.00"))
+                        new OrderItemRequest(1L, "Laptop", 1, new BigDecimal("999.00")),
+                        new OrderItemRequest(2L, "Mouse",  2, new BigDecimal("25.00"))
                 ),
                 pricing
         );
@@ -106,7 +106,7 @@ class OrderServiceIntegrationTest {
         assertThat(found.getItems()).hasSize(2);
         assertThat(found.getItems())
                 .extracting(item -> item.getProductId())
-                .containsExactlyInAnyOrder("PROD-1", "PROD-2");
+                .containsExactlyInAnyOrder(1L, 2L);
     }
 
     @Test

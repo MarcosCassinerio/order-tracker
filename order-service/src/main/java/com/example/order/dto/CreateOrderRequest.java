@@ -45,8 +45,9 @@ public record CreateOrderRequest(
     // ── DTO anidado para los ítems ─────────────────────────────────────────
     public record OrderItemRequest(
 
-            @NotBlank(message = "productId es requerido")
-            String productId,
+            @NotNull(message = "productId es requerido")
+            @Positive(message = "productId debe ser positivo")
+            Long productId,
 
             @NotBlank(message = "productName es requerido")
             String productName,

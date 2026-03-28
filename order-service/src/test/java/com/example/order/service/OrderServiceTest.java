@@ -23,7 +23,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.example.order.exception.InventoryUnavailableException;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -31,6 +34,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -54,9 +58,16 @@ import static org.mockito.Mockito.*;
 class OrderServiceTest {
 
     // ── TEST DOUBLES (mocks) ──────────────────────────────────────────────────
-    @Mock private OrderRepository         repository;
-    @Mock private PricingStrategyFactory  pricingFactory;
+    @Mock private OrderRepository           repository;
+    @Mock private PricingStrategyFactory    pricingFactory;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private WebClient                 inventoryClient;
+
+    // WebClient fluent chain mocks
+    @Mock private WebClient.RequestBodyUriSpec  requestBodyUriSpec;
+    @Mock private WebClient.RequestBodySpec     requestBodySpec;
+    @Mock private WebClient.RequestHeadersSpec<?> requestHeadersSpec;
+    @Mock private WebClient.ResponseSpec        responseSpec;
 
     // LA UNIDAD BAJO TEST — Mockito le inyecta los mocks de arriba
     @InjectMocks private OrderService service;
@@ -67,13 +78,20 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Stub del WebClient fluent chain — happy path por defecto
+        when(inventoryClient.patch()).thenReturn(requestBodyUriSpec);
+        when(requestBodyUriSpec.uri(anyString(), (Object) any())).thenReturn(requestBodySpec);
+        doReturn(requestHeadersSpec).when(requestBodySpec).bodyValue(any());
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(Void.class)).thenReturn(Mono.empty());
+
         // Request válido que usamos en la mayoría de los tests
         validRequest = new CreateOrderRequest(
                 1L,
                 "cliente@example.com",
                 List.of(
-                        new OrderItemRequest("PROD-1", "Laptop", 2, new BigDecimal("500.00")),
-                        new OrderItemRequest("PROD-2", "Mouse",  1, new BigDecimal("50.00"))
+                        new OrderItemRequest(1L, "Laptop", 2, new BigDecimal("500.00")),
+                        new OrderItemRequest(2L, "Mouse",  1, new BigDecimal("50.00"))
                 ),
                 "REGULAR"
         );
@@ -84,8 +102,8 @@ class OrderServiceTest {
                 1L,
                 "cliente@example.com",
                 List.of(
-                        OrderItem.of("PROD-1", "Laptop", 2, new BigDecimal("500.00")),
-                        OrderItem.of("PROD-2", "Mouse",  1, new BigDecimal("50.00"))
+                        OrderItem.of(1L, "Laptop", 2, new BigDecimal("500.00")),
+                        OrderItem.of(2L, "Mouse",  1, new BigDecimal("50.00"))
                 ),
                 new BigDecimal("1050.00")
         );
@@ -123,12 +141,12 @@ class OrderServiceTest {
             // ARRANGE
             var holidayRequest = new CreateOrderRequest(
                     1L, "cliente@example.com",
-                    List.of(new OrderItemRequest("PROD-1", "TV", 1, new BigDecimal("1000.00"))),
+                    List.of(new OrderItemRequest(1L, "TV", 1, new BigDecimal("1000.00"))),
                     "HOLIDAY"
             );
             var discountedOrder = Order.create(
                     1L, "cliente@example.com",
-                    List.of(OrderItem.of("PROD-1", "TV", 1, new BigDecimal("1000.00"))),
+                    List.of(OrderItem.of(1L, "TV", 1, new BigDecimal("1000.00"))),
                     new BigDecimal("800.00") // 1000 × 0.80
             );
 
@@ -281,6 +299,58 @@ class OrderServiceTest {
             assertThatThrownBy(() -> service.updateStatus(99L, req))
                     .isInstanceOf(OrderNotFoundException.class)
                     .hasMessageContaining("99");
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // placeOrder — inventory failures y rollback
+    // ══════════════════════════════════════════════════════════════════════════
+    @Nested
+    @DisplayName("placeOrder() — inventory failures")
+    class InventoryFailureTests {
+
+        @Test
+        @DisplayName("inventory falla → InventoryUnavailableException")
+        void inventoryFails_throwsException() {
+            when(responseSpec.bodyToMono(Void.class))
+                    .thenReturn(Mono.error(new RuntimeException("409 Conflict")));
+
+            when(pricingFactory.get(any())).thenReturn(new RegularPricing());
+
+            assertThatThrownBy(() -> service.placeOrder(validRequest))
+                    .isInstanceOf(InventoryUnavailableException.class);
+        }
+
+        @Test
+        @DisplayName("segundo ítem falla → release llamado una vez para el primero")
+        void secondItemFails_releasesFirstItem() {
+            // First reserve succeeds, second fails
+            when(responseSpec.bodyToMono(Void.class))
+                    .thenReturn(Mono.empty())
+                    .thenReturn(Mono.error(new RuntimeException("409 Conflict")))
+                    .thenReturn(Mono.empty()); // release of first item
+
+            when(pricingFactory.get(any())).thenReturn(new RegularPricing());
+
+            assertThatThrownBy(() -> service.placeOrder(validRequest))
+                    .isInstanceOf(InventoryUnavailableException.class);
+
+            // patch() called 3 times: reserve item1, reserve item2, release item1
+            verify(inventoryClient, times(3)).patch();
+        }
+
+        @Test
+        @DisplayName("inventory falla → pedido NO se persiste")
+        void inventoryFails_orderNotSaved() {
+            when(responseSpec.bodyToMono(Void.class))
+                    .thenReturn(Mono.error(new RuntimeException("409 Conflict")));
+
+            when(pricingFactory.get(any())).thenReturn(new RegularPricing());
+
+            assertThatThrownBy(() -> service.placeOrder(validRequest))
+                    .isInstanceOf(InventoryUnavailableException.class);
+
+            verify(repository, never()).save(any());
         }
     }
 

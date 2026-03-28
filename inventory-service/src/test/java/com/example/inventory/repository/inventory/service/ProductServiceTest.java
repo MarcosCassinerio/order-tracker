@@ -19,7 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
-import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -39,7 +38,7 @@ class ProductServiceTest {
 
     @BeforeEach
     void setUp() {
-        sampleProduct = Product.create("Laptop", new BigDecimal("10.00"));
+        sampleProduct = Product.create("Laptop", 10);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -54,11 +53,11 @@ class ProductServiceTest {
         void validRequest_savesProductAndPublishesEvent() {
             when(repository.save(any())).thenReturn(sampleProduct);
 
-            var req = new CreateProductRequest("Laptop", new BigDecimal("10.00"));
+            var req = new CreateProductRequest("Laptop", 10);
             ProductResponse response = service.createProduct(req);
 
             assertThat(response.name()).isEqualTo("Laptop");
-            assertThat(response.stock()).isEqualByComparingTo("10.00");
+            assertThat(response.stock()).isEqualTo(10);
 
             ArgumentCaptor<ProductCreatedEvent> eventCaptor = ArgumentCaptor.forClass(ProductCreatedEvent.class);
             verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -68,7 +67,7 @@ class ProductServiceTest {
         @Test
         @DisplayName("stock negativo → IllegalArgumentException")
         void negativeStock_throwsIllegalArgument() {
-            var req = new CreateProductRequest("Laptop", new BigDecimal("-1.00"));
+            var req = new CreateProductRequest("Laptop", -1);
 
             assertThatThrownBy(() -> service.createProduct(req))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -78,13 +77,13 @@ class ProductServiceTest {
         @Test
         @DisplayName("stock null → se crea con stock 0")
         void nullStock_defaultsToZero() {
-            var product = Product.create("Mouse", BigDecimal.ZERO);
+            var product = Product.create("Mouse", 0);
             when(repository.save(any())).thenReturn(product);
 
             var req = new CreateProductRequest("Mouse", null);
             ProductResponse response = service.createProduct(req);
 
-            assertThat(response.stock()).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(response.stock()).isEqualTo(0);
         }
     }
 
@@ -103,7 +102,7 @@ class ProductServiceTest {
             ProductResponse response = service.findById(1L);
 
             assertThat(response.name()).isEqualTo("Laptop");
-            assertThat(response.stock()).isEqualByComparingTo("10.00");
+            assertThat(response.stock()).isEqualTo(10);
         }
 
         @Test
@@ -130,12 +129,12 @@ class ProductServiceTest {
             when(repository.findById(1L)).thenReturn(Optional.of(sampleProduct));
             when(repository.save(any())).thenReturn(sampleProduct);
 
-            var req = new UpdateStockRequest(new BigDecimal("3.00"));
+            var req = new UpdateStockRequest(3);
             service.reserveStock(1L, req);
 
             ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
             verify(repository).save(captor.capture());
-            assertThat(captor.getValue().getStock()).isEqualByComparingTo("7.00");
+            assertThat(captor.getValue().getStock()).isEqualTo(7);
         }
 
         @Test
@@ -143,7 +142,7 @@ class ProductServiceTest {
         void insufficientStock_throwsException() {
             when(repository.findById(1L)).thenReturn(Optional.of(sampleProduct));
 
-            var req = new UpdateStockRequest(new BigDecimal("99.00"));
+            var req = new UpdateStockRequest(99);
 
             assertThatThrownBy(() -> service.reserveStock(1L, req))
                     .isInstanceOf(InvalidReserveAmountException.class);
@@ -154,7 +153,7 @@ class ProductServiceTest {
         void missingProduct_throwsNotFoundException() {
             when(repository.findById(99L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.reserveStock(99L, new UpdateStockRequest(BigDecimal.ONE)))
+            assertThatThrownBy(() -> service.reserveStock(99L, new UpdateStockRequest(1)))
                     .isInstanceOf(ProductNotFoundException.class);
         }
     }
@@ -172,12 +171,12 @@ class ProductServiceTest {
             when(repository.findById(1L)).thenReturn(Optional.of(sampleProduct));
             when(repository.save(any())).thenReturn(sampleProduct);
 
-            var req = new UpdateStockRequest(new BigDecimal("5.00"));
+            var req = new UpdateStockRequest(5);
             service.releaseStock(1L, req);
 
             ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
             verify(repository).save(captor.capture());
-            assertThat(captor.getValue().getStock()).isEqualByComparingTo("15.00");
+            assertThat(captor.getValue().getStock()).isEqualTo(15);
         }
 
         @Test
@@ -185,7 +184,7 @@ class ProductServiceTest {
         void missingProduct_throwsNotFoundException() {
             when(repository.findById(99L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.releaseStock(99L, new UpdateStockRequest(BigDecimal.ONE)))
+            assertThatThrownBy(() -> service.releaseStock(99L, new UpdateStockRequest(1)))
                     .isInstanceOf(ProductNotFoundException.class);
         }
     }

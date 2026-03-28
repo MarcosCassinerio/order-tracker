@@ -17,7 +17,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -36,7 +35,7 @@ class ProductControllerTest {
     @MockBean ProductService productService;
 
     private ProductResponse sampleResponse() {
-        return new ProductResponse(1L, "Laptop", new BigDecimal("10.00"), Instant.now(), Instant.now());
+        return new ProductResponse(1L, "Laptop", 10, Instant.now(), Instant.now());
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -51,7 +50,7 @@ class ProductControllerTest {
         void validRequest_returns201WithLocation() throws Exception {
             when(productService.createProduct(any())).thenReturn(sampleResponse());
 
-            var req = new CreateProductRequest("Laptop", new BigDecimal("10.00"));
+            var req = new CreateProductRequest("Laptop", 10);
 
             mockMvc.perform(post("/api/v1/products")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -66,7 +65,7 @@ class ProductControllerTest {
         @Test
         @DisplayName("name nulo → 400 Bad Request")
         void missingName_returns400() throws Exception {
-            var req = new CreateProductRequest(null, new BigDecimal("10.00"));
+            var req = new CreateProductRequest(null, 10);
 
             mockMvc.perform(post("/api/v1/products")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -118,12 +117,12 @@ class ProductControllerTest {
         @Test
         @DisplayName("reserva válida → 200 OK con stock actualizado")
         void validReserve_returns200() throws Exception {
-            var updated = new ProductResponse(1L, "Laptop", new BigDecimal("7.00"), Instant.now(), Instant.now());
+            var updated = new ProductResponse(1L, "Laptop", 7, Instant.now(), Instant.now());
             when(productService.reserveStock(eq(1L), any())).thenReturn(updated);
 
             mockMvc.perform(patch("/api/v1/products/1/reserve")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(mapper.writeValueAsString(new UpdateStockRequest(new BigDecimal("3.00")))))
+                            .content(mapper.writeValueAsString(new UpdateStockRequest(3))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.stock").value(7.00));
         }
@@ -136,7 +135,7 @@ class ProductControllerTest {
 
             mockMvc.perform(patch("/api/v1/products/1/reserve")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(mapper.writeValueAsString(new UpdateStockRequest(new BigDecimal("99.00")))))
+                            .content(mapper.writeValueAsString(new UpdateStockRequest(99))))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.title").value("Insufficient Stock"));
         }
@@ -152,12 +151,12 @@ class ProductControllerTest {
         @Test
         @DisplayName("release válido → 200 OK con stock actualizado")
         void validRelease_returns200() throws Exception {
-            var updated = new ProductResponse(1L, "Laptop", new BigDecimal("15.00"), Instant.now(), Instant.now());
+            var updated = new ProductResponse(1L, "Laptop", 15, Instant.now(), Instant.now());
             when(productService.releaseStock(eq(1L), any())).thenReturn(updated);
 
             mockMvc.perform(patch("/api/v1/products/1/release")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(mapper.writeValueAsString(new UpdateStockRequest(new BigDecimal("5.00")))))
+                            .content(mapper.writeValueAsString(new UpdateStockRequest(5))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.stock").value(15.00));
         }

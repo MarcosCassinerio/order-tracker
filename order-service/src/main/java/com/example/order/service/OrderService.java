@@ -2,8 +2,10 @@ package com.example.order.service;
 
 import com.example.order.dto.CreateOrderRequest;
 import com.example.order.dto.OrderResponse;
+import com.example.order.dto.StockReservationRequest;
 import com.example.order.dto.UpdateStatusRequest;
 import com.example.order.event.OrderPlacedEvent;
+import com.example.order.exception.InventoryUnavailableException;
 import com.example.order.exception.OrderNotFoundException;
 import com.example.order.model.Order;
 import com.example.order.model.OrderItem;
@@ -15,8 +17,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -48,14 +52,17 @@ public class OrderService {
     private final OrderRepository repository;
     private final PricingStrategyFactory pricingFactory;
     private final ApplicationEventPublisher eventPublisher;
+    private final WebClient inventoryClient;
 
     // Spring inyecta automáticamente los beans que implementan estas interfaces
     public OrderService(OrderRepository repository,
                         PricingStrategyFactory pricingFactory,
-                        ApplicationEventPublisher eventPublisher) {
-        this.repository     = repository;
-        this.pricingFactory = pricingFactory;
-        this.eventPublisher = eventPublisher;
+                        ApplicationEventPublisher eventPublisher,
+                        WebClient inventoryClient) {
+        this.repository      = repository;
+        this.pricingFactory  = pricingFactory;
+        this.eventPublisher  = eventPublisher;
+        this.inventoryClient = inventoryClient;
     }
 
     // ── Comandos (escritura) ───────────────────────────────────────────────
@@ -78,7 +85,6 @@ public class OrderService {
         log.info("Creando pedido para cliente {} con pricing {}",
                 req.customerId(), req.pricingType());
 
-        // 1. Mapear items del DTO a domain objects
         List<OrderItem> items = req.items().stream()
                 .map(i -> OrderItem.of(
                         i.productId(),
@@ -87,7 +93,30 @@ public class OrderService {
                         i.unitPrice()))
                 .toList();
 
-        // 2. Calcular el total usando la estrategia seleccionada (STRATEGY)
+        List<OrderItem> reservedItems = new ArrayList<>();
+
+        for (OrderItem item : items) {
+            try {
+                inventoryClient.patch()
+                        .uri("/api/v1/products/{id}/reserve", item.getProductId())
+                        .bodyValue(new StockReservationRequest(item.getQuantity()))
+                        .retrieve()
+                        .bodyToMono(Void.class)
+                        .block();
+                reservedItems.add(item);
+            } catch (Exception e) {
+                reservedItems.forEach(reserved ->
+                        inventoryClient.patch()
+                                .uri("/api/v1/products/{id}/release", reserved.getProductId())
+                                .bodyValue(new StockReservationRequest(reserved.getQuantity()))
+                                .retrieve()
+                                .bodyToMono(Void.class)
+                                .block()
+                );
+                throw new InventoryUnavailableException(item.getProductId());
+            }
+        }
+
         BigDecimal rawSubtotal = items.stream()
                 .map(OrderItem::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -96,7 +125,6 @@ public class OrderService {
                 .get(req.pricingType())
                 .calculate(rawSubtotal);
 
-        // 3. Crear el Aggregate Root — Order.create valida sus propias invariantes
         Order order = Order.create(
                 req.customerId(),
                 req.contactEmail(),
@@ -104,13 +132,10 @@ public class OrderService {
                 totalAmount
         );
 
-        // 4. Persistir
         Order saved = repository.save(order);
         log.info("Pedido #{} creado. Subtotal: {} → Total con descuento: {}",
                 saved.getId(), rawSubtotal, totalAmount);
 
-        // 5. Publicar evento — los listeners reaccionan de forma asíncrona (OBSERVER)
-        // OrderService no sabe qué listeners existen. Desacoplamiento total.
         eventPublisher.publishEvent(new OrderPlacedEvent(saved));
 
         return OrderResponse.from(saved);
