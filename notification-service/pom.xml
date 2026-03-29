@@ -22,6 +22,12 @@
     </properties>
 
     <dependencies>
+        <!-- Web: needed for Actuator HTTP health endpoints (/actuator/health) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
         <!-- RabbitMQ: consume messages from queue -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -5,7 +5,7 @@ metadata:
   name: order-service
   namespace: order-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: order-service
@@ -17,7 +17,7 @@ spec:
       containers:
         - name: order-service
           image: ghcr.io/marcoscassinerio/order-tracker/order-service:latest
-          imagePullPolicy: Always    # always pull latest image — enables auto-update on rollout restart
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
@@ -33,6 +33,10 @@ spec:
                   key: db-password
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/orders
+            - name: RABBITMQ_HOST
+              value: rabbitmq.notification-service.svc.cluster.local
+            - name: INVENTORY_SERVICE_URL
+              value: http://inventory-service.inventory-service.svc.cluster.local
           resources:
             requests:
               memory: 256Mi
@@ -40,18 +44,22 @@ spec:
             limits:
               memory: 512Mi
               cpu: 500m
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            failureThreshold: 30
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8080
-            initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8080
-            initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 3
 
@@ -70,6 +78,101 @@ spec:
   type: LoadBalancer
 
 ---
+# ── RabbitMQ ───────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-alpine
+          ports:
+            - containerPort: 5672
+          volumeMounts:
+            - name: rabbitmq-config
+              mountPath: /etc/rabbitmq/rabbitmq.conf
+              subPath: rabbitmq.conf
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 100m
+            limits:
+              memory: 1Gi
+              cpu: 250m
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+      volumes:
+        - name: rabbitmq-config
+          configMap:
+            name: rabbitmq-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: notification-service
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - port: 5672
+      targetPort: 5672
+  type: ClusterIP
+
+---
+# ── notification-service ───────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: ghcr.io/marcoscassinerio/order-tracker/notification-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8082
+          env:
+            - name: RABBITMQ_HOST
+              value: rabbitmq.notification-service.svc.cluster.local
+            - name: RABBITMQ_PORT
+              value: "5672"
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 250m
+          # Health probes will be added after spring-boot-starter-web is added and image rebuilt
+
+---
 # ── inventory-service ──────────────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
@@ -77,7 +180,7 @@ metadata:
   name: inventory-service
   namespace: inventory-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: inventory-service
@@ -112,18 +215,22 @@ spec:
             limits:
               memory: 512Mi
               cpu: 500m
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            failureThreshold: 30
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8081
-            initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8081
-            initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 3
 
