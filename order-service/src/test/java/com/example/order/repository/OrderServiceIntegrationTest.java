@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,7 +70,9 @@ class OrderServiceIntegrationTest {
     @Autowired OrderRepository orderRepository;
 
     // Stub WebClient so tests don't need a real inventory-service running
-    @MockBean WebClient inventoryClient;
+    @MockBean WebClient       inventoryClient;
+    // Stub RabbitTemplate so tests don't need a real RabbitMQ running
+    @MockBean RabbitTemplate  rabbitTemplate;
 
     @org.junit.jupiter.api.BeforeEach
     void stubInventory() {

@@ -30,6 +30,13 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  # ── RabbitMQ ───────────────────────────────────────────────────────────────
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
   # ── Graceful shutdown (12-Factor App — Factor IX: Disposability) ──────────
   # Al recibir SIGTERM, Spring termina los requests en curso antes de apagarse.
   # Kubernetes envía SIGTERM cuando va a matar el pod.

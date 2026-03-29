@@ -4,7 +4,7 @@ import com.example.order.dto.CreateOrderRequest;
 import com.example.order.dto.CreateOrderRequest.OrderItemRequest;
 import com.example.order.dto.OrderResponse;
 import com.example.order.dto.UpdateStatusRequest;
-import com.example.order.event.OrderPlacedEvent;
+import com.example.order.dto.OrderPlacedMessage;
 import com.example.order.exception.InvalidStatusTransitionException;
 import com.example.order.exception.OrderNotFoundException;
 import com.example.order.model.Order;
@@ -24,7 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.example.order.exception.InventoryUnavailableException;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -59,10 +59,10 @@ import static org.mockito.Mockito.lenient;
 class OrderServiceTest {
 
     // ── TEST DOUBLES (mocks) ──────────────────────────────────────────────────
-    @Mock private OrderRepository           repository;
-    @Mock private PricingStrategyFactory    pricingFactory;
-    @Mock private ApplicationEventPublisher eventPublisher;
-    @Mock private WebClient                 inventoryClient;
+    @Mock private OrderRepository        repository;
+    @Mock private PricingStrategyFactory pricingFactory;
+    @Mock private RabbitTemplate         rabbitTemplate;
+    @Mock private WebClient              inventoryClient;
 
     // WebClient fluent chain mocks
     @Mock private WebClient.RequestBodyUriSpec  requestBodyUriSpec;
@@ -177,7 +177,7 @@ class OrderServiceTest {
         }
 
         @Test
-        @DisplayName("se publica el evento OrderPlacedEvent después de crear el pedido")
+        @DisplayName("se publica el mensaje a RabbitMQ después de crear el pedido")
         void placeOrder_publishesOrderPlacedEvent() {
             // ARRANGE
             when(pricingFactory.get(any())).thenReturn(new RegularPricing());
@@ -186,12 +186,12 @@ class OrderServiceTest {
             // ACT
             service.placeOrder(validRequest);
 
-            // ASSERT — verificar que se publicó el evento (OBSERVER pattern)
-            verify(eventPublisher, times(1)).publishEvent(any(OrderPlacedEvent.class));
+            // ASSERT — verificar que se envió el mensaje a RabbitMQ (OBSERVER pattern)
+            verify(rabbitTemplate, times(1)).convertAndSend(anyString(), anyString(), any(OrderPlacedMessage.class));
         }
 
         @Test
-        @DisplayName("el evento publicado contiene el pedido correcto — ArgumentCaptor")
+        @DisplayName("el mensaje publicado contiene el pedido correcto — ArgumentCaptor")
         void placeOrder_eventContainsCorrectOrder() {
             // ARRANGE
             when(pricingFactory.get(any())).thenReturn(new RegularPricing());
@@ -200,14 +200,13 @@ class OrderServiceTest {
             // ACT
             service.placeOrder(validRequest);
 
-            // ASSERT — ArgumentCaptor: capturamos lo que se pasó a publishEvent
-            // para verificar que el evento contiene los datos correctos
-            var captor = ArgumentCaptor.forClass(OrderPlacedEvent.class);
-            verify(eventPublisher).publishEvent(captor.capture());
+            // ASSERT — ArgumentCaptor: capturamos el mensaje que se pasó a RabbitMQ
+            var captor = ArgumentCaptor.forClass(OrderPlacedMessage.class);
+            verify(rabbitTemplate).convertAndSend(anyString(), anyString(), captor.capture());
 
-            OrderPlacedEvent publishedEvent = captor.getValue();
-            assertThat(publishedEvent.order().getCustomerId()).isEqualTo(1L);
-            assertThat(publishedEvent.occurredAt()).isNotNull();
+            OrderPlacedMessage message = captor.getValue();
+            assertThat(message.customerId()).isEqualTo(1L);
+            assertThat(message.occurredAt()).isNotNull();
         }
 
         @Test
@@ -223,8 +222,8 @@ class OrderServiceTest {
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("DB connection lost");
 
-            // El evento NUNCA debe publicarse si la persistencia falló
-            verify(eventPublisher, never()).publishEvent(any());
+            // El mensaje NUNCA debe enviarse a RabbitMQ si la persistencia falló
+            verify(rabbitTemplate, never()).convertAndSend(anyString(), anyString(), any(Object.class));
         }
 
         @Test

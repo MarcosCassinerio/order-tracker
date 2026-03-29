@@ -18,18 +18,58 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Spring Boot app ──────────────────────────────────────────────────────────
+  # ── RabbitMQ ─────────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"    # AMQP port (used by services)
+      - "15672:15672"  # management UI: http://localhost:15672 (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── order-service ────────────────────────────────────────────────────────────
   app:
-    build: .            # uses the Dockerfile in the current directory
+    build: order-service
     ports:
       - "8080:8080"
     environment:
-      DB_URL:      jdbc:postgresql://postgres:5432/orders   # 'postgres' = container name above
+      DB_URL:            jdbc:postgresql://postgres:5432/orders
+      DB_USERNAME:       app
+      DB_PASSWORD:       secret
+      RABBITMQ_HOST:     rabbitmq
+      INVENTORY_SERVICE_URL: http://inventory-service:8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ── inventory-service ────────────────────────────────────────────────────────
+  inventory-service:
+    build: inventory-service
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL:      jdbc:postgresql://postgres:5432/orders
       DB_USERNAME: app
       DB_PASSWORD: secret
     depends_on:
       postgres:
-        condition: service_healthy   # waits for postgres healthcheck to pass before starting
+        condition: service_healthy
+
+  # ── notification-service ─────────────────────────────────────────────────────
+  notification-service:
+    build: notification-service
+    ports:
+      - "8082:8082"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   postgres_data:
