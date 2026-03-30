@@ -3,6 +3,7 @@ package com.example.order.service;
 import com.example.order.dto.CreateOrderRequest;
 import com.example.order.dto.CreateOrderRequest.OrderItemRequest;
 import com.example.order.dto.OrderResponse;
+import com.example.order.exception.InventoryServiceException;
 import com.example.order.exception.InventoryUnavailableException;
 import com.example.order.model.OrderStatus;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -133,13 +134,13 @@ class OrderServiceInventoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("inventory service caído (503) → rollback y InventoryUnavailableException")
+    @DisplayName("inventory service caído (503) → rollback y InventoryServiceException")
     void placeOrder_inventoryDown_throwsException() {
         wireMock.stubFor(patch(urlPathMatching("/api/v1/products/.*/reserve"))
                 .willReturn(aResponse().withStatus(503)));
 
         assertThatThrownBy(() -> orderService.placeOrder(validRequest()))
-                .isInstanceOf(InventoryUnavailableException.class);
+                .isInstanceOf(InventoryServiceException.class);
     }
 
     // ── Fixture ───────────────────────────────────────────────────────────────
