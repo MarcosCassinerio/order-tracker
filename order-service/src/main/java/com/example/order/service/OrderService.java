@@ -6,6 +6,7 @@ import com.example.order.dto.StockReservationRequest;
 import com.example.order.dto.UpdateStatusRequest;
 import com.example.order.config.RabbitMQConfig;
 import com.example.order.dto.OrderPlacedMessage;
+import com.example.order.exception.InventoryServiceException;
 import com.example.order.exception.InventoryUnavailableException;
 import com.example.order.exception.OrderNotFoundException;
 import com.example.order.model.Order;
@@ -19,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -105,16 +107,15 @@ public class OrderService {
                         .bodyToMono(Void.class)
                         .block();
                 reservedItems.add(item);
+            } catch (WebClientResponseException e) {
+                releaseAll(reservedItems);
+                if (e.getStatusCode() == org.springframework.http.HttpStatus.CONFLICT) {
+                    throw new InventoryUnavailableException(item.getProductId());
+                }
+                throw new InventoryServiceException(item.getProductId(), e);
             } catch (Exception e) {
-                reservedItems.forEach(reserved ->
-                        inventoryClient.patch()
-                                .uri("/api/v1/products/{id}/release", reserved.getProductId())
-                                .bodyValue(new StockReservationRequest(reserved.getQuantity()))
-                                .retrieve()
-                                .bodyToMono(Void.class)
-                                .block()
-                );
-                throw new InventoryUnavailableException(item.getProductId());
+                releaseAll(reservedItems);
+                throw new InventoryServiceException(item.getProductId(), e);
             }
         }
 
@@ -177,6 +178,17 @@ public class OrderService {
     }
 
     // ── Helper privado ─────────────────────────────────────────────────────
+
+    private void releaseAll(List<OrderItem> reservedItems) {
+        reservedItems.forEach(reserved ->
+                inventoryClient.patch()
+                        .uri("/api/v1/products/{id}/release", reserved.getProductId())
+                        .bodyValue(new StockReservationRequest(reserved.getQuantity()))
+                        .retrieve()
+                        .bodyToMono(Void.class)
+                        .block()
+        );
+    }
 
     /**
      * Fail fast: lanzar excepción con tipo específico si el pedido no existe.

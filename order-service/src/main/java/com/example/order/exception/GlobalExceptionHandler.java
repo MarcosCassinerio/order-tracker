@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.List;
  *   }
  */
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     // 404 — Recurso no encontrado
@@ -36,6 +38,16 @@ public class GlobalExceptionHandler {
         pd.setTitle("Order Not Found");
         pd.setType(URI.create("https://api.example.com/errors/order-not-found"));
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(pd);
+    }
+
+    // 503 — inventory-service no disponible (error de infraestructura)
+    @ExceptionHandler(InventoryServiceException.class)
+    public ResponseEntity<ProblemDetail> handleInventoryServiceError(InventoryServiceException ex) {
+        log.error("inventory-service error: {}", ex.getMessage(), ex.getCause());
+        var pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        pd.setTitle("Inventory Service Unavailable");
+        pd.setType(URI.create("https://api.example.com/errors/inventory-service-unavailable"));
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(pd);
     }
 
     // 409 — Stock insuficiente en inventory-service

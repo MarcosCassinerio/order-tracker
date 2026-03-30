@@ -23,9 +23,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.example.order.exception.InventoryServiceException;
 import com.example.order.exception.InventoryUnavailableException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -311,22 +314,44 @@ class OrderServiceTest {
     class InventoryFailureTests {
 
         @Test
-        @DisplayName("inventory falla → InventoryUnavailableException")
-        void inventoryFails_throwsException() {
+        @DisplayName("inventory responde 409 → InventoryUnavailableException")
+        void inventoryReturns409_throwsInventoryUnavailable() {
+            var ex = WebClientResponseException.create(HttpStatus.CONFLICT.value(), "Conflict", null, null, null);
             when(responseSpec.bodyToMono(Void.class))
-                    .thenReturn(Mono.error(new RuntimeException("409 Conflict")));
+                    .thenReturn(Mono.error(ex));
 
             assertThatThrownBy(() -> service.placeOrder(validRequest))
                     .isInstanceOf(InventoryUnavailableException.class);
         }
 
         @Test
+        @DisplayName("inventory responde 500 → InventoryServiceException")
+        void inventoryReturns500_throwsInventoryServiceException() {
+            var ex = WebClientResponseException.create(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Server Error", null, null, null);
+            when(responseSpec.bodyToMono(Void.class))
+                    .thenReturn(Mono.error(ex));
+
+            assertThatThrownBy(() -> service.placeOrder(validRequest))
+                    .isInstanceOf(InventoryServiceException.class);
+        }
+
+        @Test
+        @DisplayName("network error → InventoryServiceException")
+        void networkError_throwsInventoryServiceException() {
+            when(responseSpec.bodyToMono(Void.class))
+                    .thenReturn(Mono.error(new RuntimeException("Connection refused")));
+
+            assertThatThrownBy(() -> service.placeOrder(validRequest))
+                    .isInstanceOf(InventoryServiceException.class);
+        }
+
+        @Test
         @DisplayName("segundo ítem falla → release llamado una vez para el primero")
         void secondItemFails_releasesFirstItem() {
-            // First reserve succeeds, second fails
+            var ex = WebClientResponseException.create(HttpStatus.CONFLICT.value(), "Conflict", null, null, null);
             when(responseSpec.bodyToMono(Void.class))
                     .thenReturn(Mono.empty())
-                    .thenReturn(Mono.error(new RuntimeException("409 Conflict")))
+                    .thenReturn(Mono.error(ex))
                     .thenReturn(Mono.empty()); // release of first item
 
             assertThatThrownBy(() -> service.placeOrder(validRequest))
@@ -339,8 +364,9 @@ class OrderServiceTest {
         @Test
         @DisplayName("inventory falla → pedido NO se persiste")
         void inventoryFails_orderNotSaved() {
+            var ex = WebClientResponseException.create(HttpStatus.CONFLICT.value(), "Conflict", null, null, null);
             when(responseSpec.bodyToMono(Void.class))
-                    .thenReturn(Mono.error(new RuntimeException("409 Conflict")));
+                    .thenReturn(Mono.error(ex));
 
             assertThatThrownBy(() -> service.placeOrder(validRequest))
                     .isInstanceOf(InventoryUnavailableException.class);
